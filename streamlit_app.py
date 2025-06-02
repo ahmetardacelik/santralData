@@ -509,7 +509,4 @@ st.markdown("""
     <p>⚡ EPIAS Elektrik Verisi Çekici - WebSocket Güvenli Versiyon</p>
     <p>Bağlantı problemlerinde otomatik olarak kaldığı yerden devam eder</p>
 </div>
-""", unsafe_allow_html=True)
-
-if __name__ == "__main__":
-    main() 
+""", unsafe_allow_html=True) 
