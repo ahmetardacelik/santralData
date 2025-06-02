@@ -8,6 +8,31 @@ textColor = "#262730"
 headless = true
 enableCORS = false
 enableXsrfProtection = false
+# WebSocket timeout ayarları - uzun işlemler için
+maxUploadSize = 200
+maxMessageSize = 200
+enableWebsocketCompression = true
+# Timeout'ları artır
+runOnSave = false
+allowRunOnSave = false
 
 [browser]
-gatherUsageStats = false 
+gatherUsageStats = false
+
+# Global ayarlar
+[global]
+# Development modunda otomatik reload'u kapat
+developmentMode = false
+# Log level
+logLevel = "info"
+
+# Runner ayarları
+[runner]
+# Magic commands devre dışı
+magicEnabled = false
+# Install pip deps otomatik olarak
+installTracer = false
+# Fast re-run
+fastReruns = true
+# Enforce serialize edilebilir session state
+enforceSerializableSessionState = false 
