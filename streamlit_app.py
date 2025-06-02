@@ -148,8 +148,8 @@ def get_cached_power_plants():
         st.error(f"Santral listesi alınamadı: {e}")
     return []
 
-def safe_extraction_with_resume(extractor, start_date, end_date, power_plant_id=None, chunk_days=3):
-    """WebSocket kopma durumunda devam edebilen güvenli veri çekme - İyileştirilmiş versiyon"""
+def safe_extraction_with_resume(extractor, start_date, end_date, power_plant_id=None, chunk_days=7):
+    """WebSocket kopma durumunda devam edebilen güvenli veri çekme"""
     
     # Session state'te progress takibi
     extraction_key = f"{start_date}_{end_date}_{power_plant_id or 'all'}"
@@ -171,15 +171,6 @@ def safe_extraction_with_resume(extractor, start_date, end_date, power_plant_id=
     current_start = datetime.strptime(start_date, "%Y-%m-%d")
     final_end = datetime.strptime(end_date, "%Y-%m-%d")
     
-    # Akıllı chunk boyutu belirleme
-    total_days = (final_end - current_start).days
-    if total_days > 1825:  # 5+ yıl
-        chunk_days = min(chunk_days, 1)
-        st.warning("⚠️ 5+ yıllık veri için chunk boyutu 1 güne düşürüldü")
-    elif total_days > 1095:  # 3+ yıl
-        chunk_days = min(chunk_days, 2)
-        st.info("ℹ️ 3+ yıllık veri için chunk boyutu 2 güne düşürüldü")
-    
     all_chunks = []
     temp_start = current_start
     while temp_start < final_end:
@@ -191,14 +182,9 @@ def safe_extraction_with_resume(extractor, start_date, end_date, power_plant_id=
     
     progress_info['total_chunks'] = len(all_chunks)
     
-    # Progress bar ve status
+    # Progress bar
     progress_bar = st.progress(0)
     status_text = st.empty()
-    stats_text = st.empty()
-    
-    # Retry mekanizması için değişkenler
-    max_retries = 3
-    consecutive_failures = 0
     
     # Tamamlanmamış chunk'ları işle
     for i, (chunk_start, chunk_end) in enumerate(all_chunks):
@@ -207,79 +193,54 @@ def safe_extraction_with_resume(extractor, start_date, end_date, power_plant_id=
         if chunk_key in progress_info['completed_chunks']:
             continue  # Bu chunk zaten tamamlanmış
         
-        status_text.text(f"📊 Veri çekiliyor: {chunk_start} - {chunk_end} ({i+1}/{len(all_chunks)})")
+        status_text.text(f"📊 Veri çekiliyor: {chunk_start} - {chunk_end}")
         
-        retry_count = 0
-        chunk_success = False
-        
-        while retry_count < max_retries and not chunk_success:
-            try:
-                # Bağlantıyı kontrol et
-                if not check_connection():
-                    st.error("❌ Bağlantı kesildi! Lütfen yeniden giriş yapın.")
-                    return None
+        try:
+            # Bağlantıyı kontrol et
+            if not check_connection():
+                st.error("❌ Bağlantı kesildi! Lütfen yeniden giriş yapın.")
+                return None
+            
+            # Chunk'ı çek
+            chunk_data = extractor.get_injection_quantity_data(
+                extractor.format_date_for_api(chunk_start),
+                extractor.format_date_for_api(chunk_end),
+                power_plant_id
+            )
+            
+            if chunk_data:
+                progress_info['all_data'].extend(chunk_data)
+                progress_info['completed_chunks'].append(chunk_key)
                 
-                # Chunk'ı çek
-                chunk_data = extractor.get_injection_quantity_data(
-                    extractor.format_date_for_api(chunk_start),
-                    extractor.format_date_for_api(chunk_end),
-                    power_plant_id
-                )
+                # Progress güncelle
+                progress = (len(progress_info['completed_chunks']) / progress_info['total_chunks'])
+                progress_bar.progress(progress)
                 
-                if chunk_data:
-                    progress_info['all_data'].extend(chunk_data)
-                    progress_info['completed_chunks'].append(chunk_key)
-                    
-                    # Progress güncelle
-                    progress = (len(progress_info['completed_chunks']) / progress_info['total_chunks'])
-                    progress_bar.progress(progress)
-                    
-                    # Stats göster
-                    stats_text.text(f"✅ Toplam: {len(progress_info['all_data'])} kayıt | Tamamlanan: {len(progress_info['completed_chunks'])}/{progress_info['total_chunks']} chunk")
-                    
-                    st.success(f"✅ {chunk_start} - {chunk_end}: {len(chunk_data)} kayıt")
-                    
-                    # Session state'i güncelle - WebSocket-safe
-                    st.session_state.extraction_progress[extraction_key] = progress_info
-                    
-                    chunk_success = True
-                    consecutive_failures = 0
-                    
-                else:
-                    st.warning(f"⚠️ {chunk_start} - {chunk_end}: Veri bulunamadı")
-                    chunk_success = True  # Veri yoksa da geç
+                st.success(f"✅ {chunk_start} - {chunk_end}: {len(chunk_data)} kayıt")
                 
-                # API'ye yük bindirmemek için bekle
-                if total_days > 365:  # 1+ yıl için daha uzun bekle
-                    time.sleep(1.5)
-                else:
-                    time.sleep(0.5)
+                # Session state'i güncelle - WebSocket-safe
+                st.session_state.extraction_progress[extraction_key] = progress_info
                 
-            except Exception as e:
-                retry_count += 1
-                consecutive_failures += 1
-                
-                if retry_count < max_retries:
-                    st.warning(f"⚠️ {chunk_start} - {chunk_end} hatası (Deneme {retry_count}/{max_retries}): {e}")
-                    time.sleep(min(retry_count * 2, 10))  # Exponential backoff
-                else:
-                    st.error(f"❌ {chunk_start} - {chunk_end} başarısız ({max_retries} deneme): {e}")
-                    
-                    # Çok fazla ardışık hata varsa dur
-                    if consecutive_failures >= 5:
-                        st.error("🛑 Çok fazla ardışık hata. İşlem durduruluyor.")
-                        return None
+            else:
+                st.warning(f"⚠️ {chunk_start} - {chunk_end}: Veri bulunamadı")
+            
+            # API'ye yük bindirmemek için bekle
+            time.sleep(0.5)
+            
+        except Exception as e:
+            st.error(f"❌ {chunk_start} - {chunk_end} hatası: {e}")
+            # Hata durumunda daha uzun bekle
+            time.sleep(2)
+            continue
     
     # Tamamlandı mı kontrol et
     if len(progress_info['completed_chunks']) == progress_info['total_chunks']:
         progress_info['completed'] = True
         status_text.text("🎉 Veri çekme tamamlandı!")
-        stats_text.text(f"✅ Toplam: {len(progress_info['all_data'])} kayıt başarıyla çekildi")
         progress_bar.progress(1.0)
         return progress_info['all_data']
     else:
         status_text.text(f"⏸️ İşlem durdu: {len(progress_info['completed_chunks'])}/{progress_info['total_chunks']} chunk tamamlandı")
-        stats_text.text(f"📊 Şu ana kadar: {len(progress_info['all_data'])} kayıt çekildi")
         st.warning("İşlem yarıda kaldı. 'Devam Et' butonuna basarak kaldığı yerden devam edebilirsiniz.")
         return None
 
@@ -355,23 +316,8 @@ else:
             "📦 Chunk Boyutu (Gün)", 
             min_value=1, 
             max_value=15, 
-            value=3,  # Daha küçük default
-            help="Küçük chunk'lar daha güvenli ama yavaş. Büyük veri setleri için 1-3 gün önerilir."
-        )
-        
-        # Büyük veri seti uyarısı
-        st.info("💡 **Büyük Veri Setleri İçin İpuçları:**")
-        st.markdown("""
-        - **1-3 yıl**: 3-5 günlük chunk'lar
-        - **3-5 yıl**: 1-3 günlük chunk'lar  
-        - **5+ yıl**: 1 günlük chunk'lar (çok yavaş ama güvenli)
-        """)
-        
-        # Auto-save seçeneği
-        auto_save = st.checkbox(
-            "🔄 Otomatik Kayıt", 
-            value=True,
-            help="Her chunk tamamlandığında otomatik olarak progress kaydet"
+            value=7,
+            help="Küçük chunk'lar daha güvenli ama yavaş. Bağlantı problemi varsa küçültün."
         )
         
         # Cache temizleme
@@ -496,50 +442,14 @@ else:
                     start_str = start_date.strftime("%Y-%m-%d")
                     end_str = end_date.strftime("%Y-%m-%d")
                     
-                    # Tarih aralığını kontrol et ve uyarılar ver
+                    # Tarih aralığını kontrol et
                     total_days = (end_date - start_date).days
                     
-                    # Büyük veri seti uyarıları
-                    if total_days > 1825:  # 5+ yıl
-                        st.error("🚨 **5+ Yıllık Veri Seti Uyarısı**")
-                        st.markdown("""
-                        **⚠️ Çok büyük veri seti!** Öneriler:
-                        - **Railway.app veya Heroku** kullanın (daha güvenilir)
-                        - **Chunk boyutunu 1 güne** düşürün
-                        - **İşlem 2-4 saat** sürebilir
-                        - **Sabırlı olun** ve connection koptuğunda "Devam Et" kullanın
-                        """)
-                        
-                        if not st.checkbox("⚠️ Riskleri anladım, devam etmek istiyorum"):
-                            st.stop()
-                            
-                    elif total_days > 1095:  # 3+ yıl
-                        st.warning("⚠️ **3+ Yıllık Veri Seti**")
-                        st.markdown("""
-                        **Öneriler:**
-                        - **Chunk boyutunu 1-2 güne** düşürün
-                        - **İşlem 1-2 saat** sürebilir
-                        - **Railway.app** daha güvenilir olacaktır
-                        """)
-                        
-                    elif total_days > 365:  # 1+ yıl
-                        st.info("ℹ️ **1+ Yıllık Veri Seti**")
-                        st.markdown("""
-                        - İşlem **30-60 dakika** sürebilir
-                        - Connection koptuğunda **"Devam Et"** kullanın
-                        """)
+                    if total_days > 365:
+                        st.warning("⚠️ 1 yıldan uzun dönemler için işlem uzun sürebilir ve connection kopma riski yüksektir.")
                     
                     st.info(f"📊 Veri çekme başlatıldı: {start_str} - {end_str} ({total_days} gün)")
                     st.info(f"📦 Chunk boyutu: {chunk_days} gün")
-                    
-                    # Estimated time calculation
-                    estimated_chunks = total_days // chunk_days + (1 if total_days % chunk_days else 0)
-                    estimated_minutes = estimated_chunks * 0.5  # Her chunk ~30 saniye
-                    
-                    if estimated_minutes > 60:
-                        st.info(f"⏱️ Tahmini süre: ~{estimated_minutes/60:.1f} saat ({estimated_chunks} chunk)")
-                    else:
-                        st.info(f"⏱️ Tahmini süre: ~{estimated_minutes:.0f} dakika ({estimated_chunks} chunk)")
                     
                     # Connection-safe extraction başlat
                     with st.spinner("Veri çekiliyor... (Bu işlem uzun sürebilir)"):
@@ -554,7 +464,6 @@ else:
                         if final_data:
                             st.session_state.last_result = final_data
                             st.success(f"🎉 İşlem tamamlandı! {len(final_data)} kayıt çekildi.")
-                            st.balloons()  # Başarı kutlaması!
                             st.rerun()
             else:
                 st.error("❌ Başlangıç tarihi bitiş tarihinden sonra olamaz!")
