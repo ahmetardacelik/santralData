@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  epias-app:
+    build: .
+    ports:
+      - "5000:5000"
+    volumes:
+      # Mount source code for development (comment out for production)
+      - "./backend:/app/backend"
+      - "./frontend:/app/frontend"
+      # Persist downloads and logs
+      - "./data/downloads:/app/backend/downloads"
+      - "./data/logs:/app/backend/logs"
+    environment:
+      - FLASK_ENV=development
+      - SECRET_KEY=development-secret-key-change-in-production
+      - PORT=5000
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Nginx reverse proxy (optional for production)
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - "./nginx.conf:/etc/nginx/nginx.conf"
+      - "./frontend:/usr/share/nginx/html"
+    depends_on:
+      - epias-app
+    restart: unless-stopped
+
+volumes:
+  downloads:
+  logs: 
