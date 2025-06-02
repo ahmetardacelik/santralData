@@ -36,14 +36,30 @@ class EpiasExtractor:
         self.setup_logging()
         
     def setup_logging(self):
-        """Logging setup"""
+        """Logging setup - cloud deployment friendly"""
+        handlers = []
+        
+        # Always add console handler
+        handlers.append(logging.StreamHandler())
+        
+        # Try to add file handler if possible (for local development)
+        try:
+            # Create logs directory if it doesn't exist
+            log_dir = 'backend/logs'
+            os.makedirs(log_dir, exist_ok=True)
+            
+            # Add file handler
+            file_handler = logging.FileHandler('backend/logs/epias_api.log', encoding='utf-8')
+            handlers.append(file_handler)
+        except (OSError, PermissionError):
+            # If file logging fails (e.g., in cloud environment), just use console
+            pass
+        
         logging.basicConfig(
             level=logging.INFO,
             format='%(asctime)s - %(levelname)s - %(message)s',
-            handlers=[
-                logging.FileHandler('backend/logs/epias_api.log', encoding='utf-8'),
-                logging.StreamHandler()
-            ]
+            handlers=handlers,
+            force=True  # Override any existing logging config
         )
         self.logger = logging.getLogger(__name__)
     
