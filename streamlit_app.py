@@ -247,10 +247,12 @@ def get_cached_power_plants():
         # Don't show error here, let the calling function handle it
         return None
 
-def safe_extraction_with_resume(extractor, start_date, end_date, power_plant_id=None, chunk_days=7):
+def safe_extraction_with_resume(extractor, start_date, end_date, power_plant_id=None, power_plant_name=None, chunk_days=7):
     """WebSocket kopma durumunda devam edebilen güvenli veri çekme"""
     
-    extraction_key = f"{start_date}_{end_date}_{power_plant_id or 'all'}"
+    # Daha unique extraction key oluştur
+    plant_key = f"plant_{power_plant_id}" if power_plant_id else "all_plants"
+    extraction_key = f"{start_date}_{end_date}_{plant_key}"
     if extraction_key not in st.session_state.extraction_progress:
         st.session_state.extraction_progress[extraction_key] = {
             'completed_chunks': [],
@@ -258,6 +260,7 @@ def safe_extraction_with_resume(extractor, start_date, end_date, power_plant_id=
             'start_date': start_date,
             'end_date': end_date,
             'power_plant_id': power_plant_id,
+            'power_plant_name': power_plant_name or ("Seçili Santral" if power_plant_id else "Tüm Santraller"),
             'total_chunks': 0,
             'completed': False
         }
@@ -308,11 +311,44 @@ def safe_extraction_with_resume(extractor, start_date, end_date, power_plant_id=
         progress_info['completed'] = True
         status_text.text("🎉 Veri çekme tamamlandı!")
         progress_bar.progress(1.0)
-        return progress_info['all_data']
+        
+        # Apply client-side filtering for specific power plants
+        final_data = filter_data_for_power_plant(
+            progress_info['all_data'], 
+            power_plant_id, 
+            power_plant_name
+        )
+        
+        return final_data
     else:
         status_text.text(f"⏸️ İşlem durdu: {len(progress_info['completed_chunks'])}/{progress_info['total_chunks']} chunk tamamlandı")
         st.warning("İşlem yarıda kaldı. 'Devam Et' butonuna basarak kaldığı yerden devam edebilirsiniz.")
         return None
+
+def filter_data_for_power_plant(data, power_plant_id, power_plant_name):
+    """
+    Filter data to include only the selected power plant and validate results
+    This ensures we only get data for the specific plant, like the EPIAS website
+    """
+    if not power_plant_id or not data:
+        return data
+    
+    # Filter data for specific power plant
+    filtered_data = []
+    for record in data:
+        # Check if this record belongs to our selected power plant
+        if (record.get('powerPlantId') == power_plant_id or 
+            record.get('id') == power_plant_id or
+            power_plant_name.lower() in str(record.get('name', '')).lower()):
+            filtered_data.append(record)
+    
+    st.info(f"🔍 Filtre uygulandı: {len(filtered_data)} kayıt, seçili santral: {power_plant_name}")
+    
+    if len(filtered_data) == 0:
+        st.warning(f"⚠️ Seçili santral ({power_plant_name}) için bu tarih aralığında veri bulunamadı.")
+        st.info("💡 Bu, santralın belirtilen dönemde elektrik üretmediği anlamına gelebilir.")
+    
+    return filtered_data
 
 # Authentication Section
 if not st.session_state.authenticated:
@@ -412,8 +448,9 @@ else:
         st.subheader("⏳ Devam Eden/Tamamlanan İşlemler")
         
         for key, progress in st.session_state.extraction_progress.items():
-            with st.expander(f"📈 {progress['start_date']} - {progress['end_date']} {'(Tamamlandı)' if progress['completed'] else '(Devam Ediyor)'}"):
-                col1, col2, col3 = st.columns(3)
+            plant_info = f" - {progress.get('power_plant_name', 'Bilinmeyen Santral')}"
+            with st.expander(f"📈 {progress['start_date']} - {progress['end_date']}{plant_info} {'(Tamamlandı)' if progress['completed'] else '(Devam Ediyor)'}"):
+                col1, col2, col3, col4 = st.columns(4)
                 
                 with col1:
                     st.metric("Toplam Chunk", progress['total_chunks'])
@@ -425,6 +462,9 @@ else:
                     completion_rate = len(progress['completed_chunks']) / progress['total_chunks'] if progress['total_chunks'] > 0 else 0
                     st.metric("Tamamlanma", f"%{completion_rate*100:.1f}")
                 
+                with col4:
+                    st.metric("Santral", progress.get('power_plant_name', 'Bilinmeyen')[:20] + "..." if len(progress.get('power_plant_name', '')) > 20 else progress.get('power_plant_name', 'Bilinmeyen'))
+                
                 if not progress['completed'] and len(progress['all_data']) > 0:
                     if st.button(f"▶️ Devam Et - {key}", key=f"resume_{key}"):
                         with st.spinner("Kaldığı yerden devam ediliyor..."):
@@ -433,6 +473,7 @@ else:
                                 progress['start_date'],
                                 progress['end_date'],
                                 progress['power_plant_id'],
+                                progress.get('power_plant_name'),
                                 chunk_days
                             )
                             if final_data:
@@ -515,13 +556,16 @@ else:
                 )
                 # Fix the power_plant_id assignment to handle None properly
                 power_plant_id = selected_plant.get('id') if selected_plant is not None else None
+                power_plant_name = selected_plant.get('name') if selected_plant is not None else None
             else:
                 st.warning("Arama kriterinize uygun santral bulunamadı.")
                 power_plant_id = None
+                power_plant_name = None
         elif power_plants is not None and len(power_plants) == 0:
             # Empty list - no power plants available
             st.info("Sistemde kayıtlı santral bulunamadı.")
             power_plant_id = None
+            power_plant_name = None
         else:
             # power_plants is None - loading or error state
             st.warning("⚠️ Santral listesi yükleniyor... Bağlantı problemi varsa bir süre bekleyin.")
@@ -529,6 +573,10 @@ else:
                 st.cache_data.clear()
                 st.rerun()
             power_plant_id = None
+            power_plant_name = None
+    else:
+        power_plant_id = None
+        power_plant_name = None
     
     # Date selection form - separate from santral selection
     with st.form("extraction_form"):
@@ -568,6 +616,12 @@ else:
                     st.info(f"📊 Veri çekme başlatıldı: {start_str} - {end_str} ({total_days} gün)")
                     st.info(f"📦 Chunk boyutu: {chunk_days} gün")
                     
+                    if power_plant_id and power_plant_name:
+                        st.success(f"🏭 Seçili santral: {power_plant_name} (ID: {power_plant_id})")
+                        st.info("💡 Sadece seçili santralın verileri indirilecek - EPIAS website gibi!")
+                    else:
+                        st.info("🏭 Tüm santraller için veri çekiliyor")
+                    
                     # Connection-safe extraction başlat
                     with st.spinner("Veri çekiliyor... (Bu işlem uzun sürebilir)"):
                         final_data = safe_extraction_with_resume(
@@ -575,6 +629,7 @@ else:
                             start_str,
                             end_str,
                             power_plant_id,
+                            power_plant_name,
                             chunk_days
                         )
                         
