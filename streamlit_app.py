@@ -172,7 +172,7 @@ def safe_extraction_with_resume(extractor, start_date, end_date, power_plant_id=
         if temp_end > final_end:
             temp_end = final_end
         all_chunks.append((temp_start.strftime('%Y-%m-%d'), temp_end.strftime('%Y-%m-%d')))
-        temp_start = temp_end + timedelta(days=1)
+        temp_start = temp_end
     progress_info['total_chunks'] = len(all_chunks)
     progress_bar = st.progress(0)
     status_text = st.empty()
