@@ -51,9 +51,64 @@ def check_connection():
     st.session_state.connection_status = "disconnected"
     return False
 
-# Custom CSS - Connection-aware styling
+# Custom CSS - Connection-aware styling with BIG ANIMATED HEADER
 st.markdown("""
 <style>
+    @keyframes gradientShift {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+    }
+    
+    @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+        100% { transform: scale(1); }
+    }
+    
+    @keyframes slideIn {
+        0% { transform: translateY(-50px); opacity: 0; }
+        100% { transform: translateY(0); opacity: 1; }
+    }
+    
+    .mega-header {
+        background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab, #667eea, #764ba2);
+        background-size: 400% 400%;
+        animation: gradientShift 4s ease infinite;
+        padding: 4rem 2rem;
+        border-radius: 20px;
+        color: white;
+        text-align: center;
+        margin-bottom: 3rem;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        animation: slideIn 1.5s ease-out;
+    }
+    
+    .mega-title {
+        font-size: 4rem !important;
+        font-weight: 900 !important;
+        margin-bottom: 1rem !important;
+        text-shadow: 3px 3px 6px rgba(0,0,0,0.5);
+        animation: pulse 2s ease-in-out infinite;
+    }
+    
+    .mega-subtitle {
+        font-size: 1.8rem !important;
+        margin-bottom: 1rem !important;
+        opacity: 0.9;
+    }
+    
+    .version-badge {
+        display: inline-block;
+        background: rgba(255,255,255,0.2);
+        padding: 10px 20px;
+        border-radius: 50px;
+        font-weight: bold;
+        margin-top: 1rem;
+        border: 2px solid rgba(255,255,255,0.3);
+        animation: pulse 1.5s ease-in-out infinite;
+    }
+    
     .main-header {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         padding: 2rem;
@@ -124,12 +179,15 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# Main header
+# MEGA ANIMATED HEADER - You will definitely see this!
 st.markdown("""
-<div class="main-header">
-    <h1>⚡ EPIAS Elektrik Verisi Çekici</h1>
-    <p>Türkiye Elektrik Piyasası Şeffaflık Platformu Veri Çekici</p>
-    <p><strong>WebSocket Güvenli Versiyon</strong></p>
+<div class="mega-header">
+    <h1 class="mega-title">🚀 EPIAS ELEKTRIK VERİSİ ÇEKİCİ 🚀</h1>
+    <p class="mega-subtitle">⚡ Türkiye Elektrik Piyasası Şeffaflık Platformu ⚡</p>
+    <p class="mega-subtitle">🔥 WebSocket Güvenli Versiyon - ULTRA EDITION 🔥</p>
+    <div class="version-badge">
+        🎯 VERSION 2.0 - ANIMATED & IMPROVED 🎯
+    </div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -142,12 +200,26 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-st.markdown(
-    "<div style='background-color:#ffeb3b;padding:20px;text-align:center;font-size:32px;'>"
-    "🚀 <b>DEBUG: This is the latest version of streamlit_app.py!</b> 🚀"
-    "</div>",
-    unsafe_allow_html=True
-)
+st.markdown("""
+    <div style='
+        background: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4, #ffeaa7);
+        background-size: 300% 300%;
+        animation: gradientShift 3s ease infinite;
+        padding: 25px;
+        text-align: center;
+        font-size: 36px;
+        font-weight: 900;
+        color: white;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        margin-bottom: 2rem;
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    '>
+        🎉 LATEST VERSION DEPLOYED - ANIMATION EDITION! 🎉
+        <br/>
+        <span style='font-size: 24px;'>🚀 GitHub → Streamlit Cloud Pipeline Working! 🚀</span>
+    </div>
+    """, unsafe_allow_html=True)
 
 # Helper Functions - Connection-safe
 @st.cache_data(ttl=300)  # 5 dakika cache
