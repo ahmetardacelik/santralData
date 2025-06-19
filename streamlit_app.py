@@ -13,6 +13,14 @@ import io
 import time
 import json
 
+# Page config - MUST BE FIRST STREAMLIT COMMAND
+st.set_page_config(
+    page_title="EPIAS Elektrik Verisi Çekici",
+    page_icon="⚡",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
 # Add backend to path and import with error handling
 sys.path.append('backend')
 
@@ -23,14 +31,6 @@ except ImportError as e:
     st.error(f"❌ Backend modülü yüklenemedi: {e}")
     st.error("Backend klasörünü ve epias_extractor.py dosyasını kontrol edin!")
     st.stop()
-
-# Page config
-st.set_page_config(
-    page_title="EPIAS Elektrik Verisi Çekici",
-    page_icon="⚡",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
 
 # Session state initialization - WebSocket güvenli
 if 'authenticated' not in st.session_state:
@@ -469,24 +469,49 @@ else:
     
     if use_specific_plants:
         # Santral arama input'unu hemen göster
-        search_term = st.text_input("🔍 Santral Ara", placeholder="Santral adı yazın...")
+        st.markdown("**💡 İpucu:** 2496 santral arasından seçim yapmak için santral adını arayın!")
+        
+        # Hızlı arama için popüler santral tipleri
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🔥 Termik Santraller", help="Termik santralları filtrele"):
+                search_term = "termik"
+            else:
+                search_term = st.text_input(
+                    "🔍 Santral Ara", 
+                    placeholder="Örnek: Akenerji, Soma, Çatalağzı, vb...",
+                    help="Santral adının bir bölümünü yazın. Büyük/küçük harf duyarlı değil."
+                )
+        with col2:
+            if st.button("💨 Rüzgar Santralleri", help="Rüzgar santralları filtrele"):
+                search_term = "rüzgar"
+            elif st.button("☀️ Güneş Santralleri", help="Güneş santralları filtrele"):
+                search_term = "güneş"
+            elif st.button("💧 Hidroelektrik", help="Hidroelektrik santralları filtrele"):
+                search_term = "hidro"
         
         # Power plants'i yükle - UI blocking olmadan
         power_plants = get_cached_power_plants()
         
         if power_plants is not None and len(power_plants) > 0:
-            # Filtreleme
+            # Filtreleme - Tüm santralleri göster
             if search_term:
                 filtered_plants = [p for p in power_plants if search_term.lower() in p.get('name', '').lower()]
+                st.info(f"🔍 Arama sonucu: {len(filtered_plants)} santral bulundu")
             else:
-                filtered_plants = power_plants[:50]  # İlk 50 santral
+                filtered_plants = power_plants  # Tüm santralleri göster
+                st.info(f"📋 Toplam {len(filtered_plants)} santral mevcut (Arama yaparak filtreleyebilirsiniz)")
             
             if filtered_plants:
+                # Eğer çok fazla santral varsa kullanıcıyı uyar
+                if len(filtered_plants) > 100 and not search_term:
+                    st.warning("⚠️ Çok fazla santral var! Daha hızlı seçim için santral adı arayarak filtreleyebilirsiniz.")
+                
                 selected_plant = st.selectbox(
                     "Santral Seç",
                     options=[None] + filtered_plants,
                     format_func=lambda x: "Tüm Santraller" if x is None else f"{x.get('name', 'Unknown')} (ID: {x.get('id', 'N/A')})",
-                    help="Belirli bir santral seçin veya tüm santraller için 'Tüm Santraller' seçeneğini bırakın"
+                    help=f"Belirli bir santral seçin veya tüm santraller için 'Tüm Santraller' seçeneğini bırakın. Toplam {len(filtered_plants)} santral mevcut."
                 )
                 # Fix the power_plant_id assignment to handle None properly
                 power_plant_id = selected_plant.get('id') if selected_plant is not None else None
