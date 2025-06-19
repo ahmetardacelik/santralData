@@ -151,9 +151,7 @@ def get_cached_power_plants():
 def safe_extraction_with_resume(extractor, start_date, end_date, power_plant_id=None, chunk_days=7):
     """WebSocket kopma durumunda devam edebilen güvenli veri çekme"""
     
-    # Session state'te progress takibi
     extraction_key = f"{start_date}_{end_date}_{power_plant_id or 'all'}"
-    
     if extraction_key not in st.session_state.extraction_progress:
         st.session_state.extraction_progress[extraction_key] = {
             'completed_chunks': [],
@@ -164,13 +162,9 @@ def safe_extraction_with_resume(extractor, start_date, end_date, power_plant_id=
             'total_chunks': 0,
             'completed': False
         }
-    
     progress_info = st.session_state.extraction_progress[extraction_key]
-    
-    # Tarih aralığını chunk'lara böl
     current_start = datetime.strptime(start_date, "%Y-%m-%d")
     final_end = datetime.strptime(end_date, "%Y-%m-%d")
-    
     all_chunks = []
     temp_start = current_start
     while temp_start < final_end:
@@ -179,61 +173,38 @@ def safe_extraction_with_resume(extractor, start_date, end_date, power_plant_id=
             temp_end = final_end
         all_chunks.append((temp_start.strftime('%Y-%m-%d'), temp_end.strftime('%Y-%m-%d')))
         temp_start = temp_end + timedelta(days=1)
-    
     progress_info['total_chunks'] = len(all_chunks)
-    
-    # Progress bar
     progress_bar = st.progress(0)
     status_text = st.empty()
-    
-    # Tamamlanmamış chunk'ları işle
     for i, (chunk_start, chunk_end) in enumerate(all_chunks):
         chunk_key = f"{chunk_start}_{chunk_end}"
-        
         if chunk_key in progress_info['completed_chunks']:
-            continue  # Bu chunk zaten tamamlanmış
-        
+            continue
         status_text.text(f"📊 Veri çekiliyor: {chunk_start} - {chunk_end}")
-        
         try:
-            # Bağlantıyı kontrol et
             if not check_connection():
                 st.error("❌ Bağlantı kesildi! Lütfen yeniden giriş yapın.")
                 return None
-            
-            # Chunk'ı çek
             chunk_data = extractor.get_injection_quantity_data(
                 extractor.format_date_for_api(chunk_start),
                 extractor.format_date_for_api(chunk_end),
                 power_plant_id
             )
-            
+            # Always mark chunk as completed, even if empty
+            progress_info['completed_chunks'].append(chunk_key)
             if chunk_data:
                 progress_info['all_data'].extend(chunk_data)
-                progress_info['completed_chunks'].append(chunk_key)
-                
-                # Progress güncelle
-                progress = (len(progress_info['completed_chunks']) / progress_info['total_chunks'])
-                progress_bar.progress(progress)
-                
                 st.success(f"✅ {chunk_start} - {chunk_end}: {len(chunk_data)} kayıt")
-                
-                # Session state'i güncelle - WebSocket-safe
-                st.session_state.extraction_progress[extraction_key] = progress_info
-                
             else:
                 st.warning(f"⚠️ {chunk_start} - {chunk_end}: Veri bulunamadı")
-            
-            # API'ye yük bindirmemek için bekle
+            progress = (len(progress_info['completed_chunks']) / progress_info['total_chunks'])
+            progress_bar.progress(progress)
+            st.session_state.extraction_progress[extraction_key] = progress_info
             time.sleep(0.5)
-            
         except Exception as e:
             st.error(f"❌ {chunk_start} - {chunk_end} hatası: {e}")
-            # Hata durumunda daha uzun bekle
             time.sleep(2)
             continue
-    
-    # Tamamlandı mı kontrol et
     if len(progress_info['completed_chunks']) == progress_info['total_chunks']:
         progress_info['completed'] = True
         status_text.text("🎉 Veri çekme tamamlandı!")
