@@ -133,6 +133,22 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+# Footer
+st.markdown("---")
+st.markdown("""
+<div style='text-align: center; color: #666; padding: 1rem;'>
+    <p>⚡ EPIAS Elektrik Verisi Çekici - WebSocket Güvenli Versiyon</p>
+    <p>Bağlantı problemlerinde otomatik olarak kaldığı yerden devam eder</p>
+</div>
+""", unsafe_allow_html=True)
+
+st.markdown(
+    "<div style='background-color:#ffeb3b;padding:20px;text-align:center;font-size:32px;'>"
+    "🚀 <b>DEBUG: This is the latest version of streamlit_app.py!</b> 🚀"
+    "</div>",
+    unsafe_allow_html=True
+)
+
 # Helper Functions - Connection-safe
 @st.cache_data(ttl=300)  # 5 dakika cache
 def get_cached_power_plants():
@@ -471,13 +487,4 @@ else:
                     else:
                         st.error(f"❌ Excel oluşturulamadı: {result['message']}")
                 except Exception as e:
-                    st.error(f"❌ Excel oluşturma hatası: {e}")
-
-# Footer
-st.markdown("---")
-st.markdown("""
-<div style='text-align: center; color: #666; padding: 1rem;'>
-    <p>⚡ EPIAS Elektrik Verisi Çekici - WebSocket Güvenli Versiyon</p>
-    <p>Bağlantı problemlerinde otomatik olarak kaldığı yerden devam eder</p>
-</div>
-""", unsafe_allow_html=True) 
+                    st.error(f"❌ Excel oluşturma hatası: {e}") 
