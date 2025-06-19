@@ -215,9 +215,11 @@ st.markdown("""
         border-radius: 15px;
         box-shadow: 0 10px 30px rgba(0,0,0,0.3);
     '>
-        🎉 LATEST VERSION DEPLOYED - ANIMATION EDITION! 🎉
-        <br/>
-        <span style='font-size: 24px;'>🚀 GitHub → Streamlit Cloud Pipeline Working! 🚀</span>
+                 🎉 LATEST VERSION DEPLOYED - ANIMATION EDITION! 🎉
+         <br/>
+         <span style='font-size: 24px;'>🚀 GitHub → Streamlit Cloud Pipeline Working! 🚀</span>
+         <br/>
+         <span style='font-size: 18px;'>⏰ TIMESTAMP: 2025-01-19 12:10 PM - FORCED UPDATE! ⏰</span>
     </div>
     """, unsafe_allow_html=True)
 
