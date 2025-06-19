@@ -13,10 +13,16 @@ import io
 import time
 import json
 
-# Add backend to path
+# Add backend to path and import with error handling
 sys.path.append('backend')
 
-from backend.epias_extractor import EpiasExtractor
+try:
+    from backend.epias_extractor import EpiasExtractor
+    st.success("✅ Backend modülü başarıyla yüklendi!")
+except ImportError as e:
+    st.error(f"❌ Backend modülü yüklenemedi: {e}")
+    st.error("Backend klasörünü ve epias_extractor.py dosyasını kontrol edin!")
+    st.stop()
 
 # Page config
 st.set_page_config(
@@ -327,19 +333,28 @@ if not st.session_state.authenticated:
             if username and password:
                 with st.spinner("🔄 Giriş yapılıyor..."):
                     try:
+                        st.info("🔄 EpiasExtractor başlatılıyor...")
                         extractor = EpiasExtractor(username, password)
+                        st.info("🔄 Authentication çağrısı yapılıyor...")
                         auth_result = extractor.authenticate()
+                        st.info(f"🔄 Authentication sonucu: {auth_result}")
                         
-                        if auth_result['success']:
+                        if auth_result and auth_result.get('success'):
                             st.session_state.authenticated = True
                             st.session_state.extractor = extractor
                             st.session_state.connection_status = "connected"
                             st.success("✅ Giriş başarılı!")
                             st.rerun()
                         else:
-                            st.error(f"❌ Giriş başarısız: {auth_result['message']}")
+                            error_msg = auth_result.get('message', 'Bilinmeyen hata') if auth_result else 'Authentication sonucu None'
+                            st.error(f"❌ Giriş başarısız: {error_msg}")
+                    except ImportError as ie:
+                        st.error(f"❌ Import hatası - Backend modülü bulunamadı: {ie}")
+                    except AttributeError as ae:
+                        st.error(f"❌ Method hatası - EpiasExtractor.authenticate() bulunamadı: {ae}")
                     except Exception as e:
-                        st.error(f"❌ Bağlantı hatası: {e}")
+                        st.error(f"❌ Genel hata: {type(e).__name__}: {e}")
+                        st.error(f"❌ Hata detayı: {str(e)}")
             else:
                 st.error("❌ Lütfen kullanıcı adı ve şifre girin!")
 
