@@ -444,6 +444,51 @@ else:
     # Yeni veri çekme formu
     st.subheader("🆕 Yeni Veri Çekme")
     
+    # Santral seçimi - OUTSIDE the form so it appears immediately
+    st.subheader("🏭 Santral Seçimi (İsteğe Bağlı)")
+    
+    use_specific_plants = st.checkbox("Belirli santrallar için veri çek")
+    power_plant_id = None
+    
+    if use_specific_plants:
+        # Santral arama input'unu hemen göster
+        search_term = st.text_input("🔍 Santral Ara", placeholder="Santral adı yazın...")
+        
+        # Power plants'i yükle - UI blocking olmadan
+        power_plants = get_cached_power_plants()
+        
+        if power_plants is not None and len(power_plants) > 0:
+            # Filtreleme
+            if search_term:
+                filtered_plants = [p for p in power_plants if search_term.lower() in p.get('name', '').lower()]
+            else:
+                filtered_plants = power_plants[:50]  # İlk 50 santral
+            
+            if filtered_plants:
+                selected_plant = st.selectbox(
+                    "Santral Seç",
+                    options=[None] + filtered_plants,
+                    format_func=lambda x: "Tüm Santraller" if x is None else f"{x.get('name', 'Unknown')} (ID: {x.get('id', 'N/A')})",
+                    help="Belirli bir santral seçin veya tüm santraller için 'Tüm Santraller' seçeneğini bırakın"
+                )
+                # Fix the power_plant_id assignment to handle None properly
+                power_plant_id = selected_plant.get('id') if selected_plant is not None else None
+            else:
+                st.warning("Arama kriterinize uygun santral bulunamadı.")
+                power_plant_id = None
+        elif power_plants is not None and len(power_plants) == 0:
+            # Empty list - no power plants available
+            st.info("Sistemde kayıtlı santral bulunamadı.")
+            power_plant_id = None
+        else:
+            # power_plants is None - loading or error state
+            st.warning("⚠️ Santral listesi yükleniyor... Bağlantı problemi varsa bir süre bekleyin.")
+            if st.button("🔄 Santral Listesini Yenile", key="reload_plants"):
+                st.cache_data.clear()
+                st.rerun()
+            power_plant_id = None
+    
+    # Date selection form - separate from santral selection
     with st.form("extraction_form"):
         col1, col2 = st.columns(2)
         
@@ -460,51 +505,6 @@ else:
                 value=date.today() - timedelta(days=1),
                 max_value=date.today()
             )
-        
-        # Santral seçimi - cached
-        st.subheader("🏭 Santral Seçimi (İsteğe Bağlı)")
-        
-        use_specific_plants = st.checkbox("Belirli santrallar için veri çek")
-        
-        if use_specific_plants:
-            # Santral arama input'unu hemen göster
-            search_term = st.text_input("🔍 Santral Ara", placeholder="Santral adı yazın...")
-            
-            # Power plants'i yükle - UI blocking olmadan
-            power_plants = get_cached_power_plants()
-            
-            if power_plants is not None and len(power_plants) > 0:
-                # Filtreleme
-                if search_term:
-                    filtered_plants = [p for p in power_plants if search_term.lower() in p.get('name', '').lower()]
-                else:
-                    filtered_plants = power_plants[:50]  # İlk 50 santral
-                
-                if filtered_plants:
-                    selected_plant = st.selectbox(
-                        "Santral Seç",
-                        options=[None] + filtered_plants,
-                        format_func=lambda x: "Tüm Santraller" if x is None else f"{x.get('name', 'Unknown')} (ID: {x.get('id', 'N/A')})",
-                        help="Belirli bir santral seçin veya tüm santraller için 'Tüm Santraller' seçeneğini bırakın"
-                    )
-                    # Fix the power_plant_id assignment to handle None properly
-                    power_plant_id = selected_plant.get('id') if selected_plant is not None else None
-                else:
-                    st.warning("Arama kriterinize uygun santral bulunamadı.")
-                    power_plant_id = None
-            elif power_plants is not None and len(power_plants) == 0:
-                # Empty list - no power plants available
-                st.info("Sistemde kayıtlı santral bulunamadı.")
-                power_plant_id = None
-            else:
-                # power_plants is None - loading or error state
-                st.warning("⚠️ Santral listesi yükleniyor... Bağlantı problemi varsa bir süre bekleyin.")
-                if st.button("🔄 Santral Listesini Yenile", key="reload_plants"):
-                    st.cache_data.clear()
-                    st.rerun()
-                power_plant_id = None
-        else:
-            power_plant_id = None
         
         extract_button = st.form_submit_button("🚀 Veri Çekmeyi Başlat", use_container_width=True)
         
