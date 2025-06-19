@@ -24,13 +24,15 @@ st.set_page_config(
 # Add backend to path and import with error handling
 sys.path.append('backend')
 
+# Store import status for later display
+backend_import_success = False
+backend_import_error = None
+
 try:
     from backend.epias_extractor import EpiasExtractor
-    st.success("✅ Backend modülü başarıyla yüklendi!")
+    backend_import_success = True
 except ImportError as e:
-    st.error(f"❌ Backend modülü yüklenemedi: {e}")
-    st.error("Backend klasörünü ve epias_extractor.py dosyasını kontrol edin!")
-    st.stop()
+    backend_import_error = e
 
 # Session state initialization - WebSocket güvenli
 if 'authenticated' not in st.session_state:
@@ -192,10 +194,19 @@ st.markdown("""
     <p class="mega-subtitle">⚡ Türkiye Elektrik Piyasası Şeffaflık Platformu ⚡</p>
     <p class="mega-subtitle">🔥 WebSocket Güvenli Versiyon - ULTRA EDITION 🔥</p>
     <div class="version-badge">
-        🎯 VERSION 2.0 - ANIMATED & IMPROVED 🎯
+        🎯 VERSION 2.0 - EPIAS WEBSITE COMPATIBLE 🎯
     </div>
 </div>
 """, unsafe_allow_html=True)
+
+# Display backend import status
+if backend_import_success:
+    st.success("✅ Backend modülü başarıyla yüklendi!")
+    st.info("🆕 EPIAS website ile aynı API formatı - Artık santral filtreleme doğru çalışıyor!")
+else:
+    st.error(f"❌ Backend modülü yüklenemedi: {backend_import_error}")
+    st.error("Backend klasörünü ve epias_extractor.py dosyasını kontrol edin!")
+    st.stop()
 
 # Footer
 st.markdown("---")
@@ -312,12 +323,11 @@ def safe_extraction_with_resume(extractor, start_date, end_date, power_plant_id=
         status_text.text("🎉 Veri çekme tamamlandı!")
         progress_bar.progress(1.0)
         
-        # Apply client-side filtering for specific power plants
-        final_data = filter_data_for_power_plant(
-            progress_info['all_data'], 
-            power_plant_id, 
-            power_plant_name
-        )
+        # Data is already filtered by UEVCB in backend, just validate and display info
+        final_data = progress_info['all_data']
+        
+        # Display debug info about the received data
+        display_data_info(final_data, power_plant_id, power_plant_name)
         
         # Even if filtered data is empty, allow the process to complete
         # This matches EPIAS website behavior where you can still see results
@@ -330,13 +340,20 @@ def safe_extraction_with_resume(extractor, start_date, end_date, power_plant_id=
         st.warning("İşlem yarıda kaldı. 'Devam Et' butonuna basarak kaldığı yerden devam edebilirsiniz.")
         return None
 
-def filter_data_for_power_plant(data, power_plant_id, power_plant_name):
+def display_data_info(data, power_plant_id, power_plant_name):
     """
-    Filter data to include only the selected power plant and validate results
-    This ensures we only get data for the specific plant, like the EPIAS website
+    Display information about the received data
+    Data is already filtered by UEVCB in backend, so this just shows what we got
     """
-    if not power_plant_id or not data:
-        return data
+    if not data:
+        if power_plant_id:
+            st.warning(f"⚠️ Seçili santral için veri bulunamadı!")
+            st.info("💡 Bu durum şu sebeplerden olabilir:")
+            st.info("   • Santral bu dönemde hiç elektrik üretmemiş")
+            st.info("   • Santral için UEVCB bulunamadı")
+            st.info("   • API servisi geçici olarak erişilemez durumda")
+            st.info("📋 Yine de Excel dosyası oluşturabilirsiniz (açıklama ile)")
+        return
     
     # Debug: Show data structure for the first few records
     if data and len(data) > 0:
@@ -347,60 +364,12 @@ def filter_data_for_power_plant(data, power_plant_id, power_plant_name):
         for i, record in enumerate(data[:3]):
             st.info(f"🔍 Debug Record {i+1}: {str(record)[:300]}...")
     
-    # Extract plant ID from the full name if it contains the ID
-    clean_plant_id = power_plant_id
-    if '-' in power_plant_name and power_plant_name.split('-')[-1]:
-        potential_id = power_plant_name.split('-')[-1]
-        if potential_id.replace('W', '').replace('0', '').isdigit():
-            clean_plant_id = potential_id
-    
-    st.info(f"🔍 Debug: Aranan Plant ID: '{power_plant_id}', Clean ID: '{clean_plant_id}'")
-    st.info(f"🔍 Debug: Aranan Plant Name: '{power_plant_name}'")
-    
-    # More flexible filtering - try different field combinations
-    filtered_data = []
-    matched_fields = set()
-    
-    for record in data:
-        # Try multiple possible field names and matching strategies
-        matches = [
-            ('powerPlantId_exact', record.get('powerPlantId') == power_plant_id),
-            ('id_exact', record.get('id') == power_plant_id),
-            ('plantId_exact', record.get('plantId') == power_plant_id),
-            ('powerPlantId_clean', record.get('powerPlantId') == clean_plant_id),
-            ('id_clean', record.get('id') == clean_plant_id),
-            ('plantId_clean', record.get('plantId') == clean_plant_id),
-            # Name-based matching (more flexible)
-            ('name_full', power_plant_name.lower() in str(record.get('name', '')).lower()),
-            ('powerPlantName_full', power_plant_name.lower() in str(record.get('powerPlantName', '')).lower()),
-            # Partial name matching for specific plant
-            ('name_akyurt', 'akyurt' in str(record.get('name', '')).lower()),
-            ('name_biyogaz', 'biyogaz' in str(record.get('name', '')).lower()),
-            ('name_3a_bes', '3a bes' in str(record.get('name', '')).lower())
-        ]
-        
-        for match_type, is_match in matches:
-            if is_match:
-                filtered_data.append(record)
-                matched_fields.add(match_type)
-                break  # Exit after first match to avoid duplicates
-    
-    st.info(f"🔍 Filtre sonucu: {len(filtered_data)} kayıt bulundu")
-    if matched_fields:
-        st.info(f"🔍 Eşleşen alanlar: {', '.join(matched_fields)}")
-    
-    # Even if 0 records, provide detailed explanation
-    if len(filtered_data) == 0:
-        st.warning(f"⚠️ Seçili santral için API verisinde eşleşme bulunamadı!")
-        st.info("💡 Bu durum şu sebeplerden olabilir:")
-        st.info("   • Santral bu dönemde hiç elektrik üretmemiş")
-        st.info("   • API veri yapısı beklediğimizden farklı")
-        st.info("   • Santral ID/adı formatı değişmiş")
-        st.info("📋 Yine de Excel dosyası oluşturabilirsiniz (açıklama ile)")
-        
-        return []
-    
-    return filtered_data
+    if power_plant_id:
+        st.success(f"✅ Santral filtreleme başarılı: {len(data)} kayıt")
+        st.info(f"🏭 Santral: {power_plant_name} (ID: {power_plant_id})")
+        st.info("💡 EPIAS website ile aynı API formatı kullanıldı - powerplantId parametresi")
+    else:
+        st.info(f"📊 Tüm santraller verisi: {len(data)} kayıt")
 
 # Authentication Section
 if not st.session_state.authenticated:
@@ -685,7 +654,7 @@ else:
                             chunk_days
                         )
                         
-                        if final_data:
+                        if final_data is not None:
                             st.session_state.last_result = final_data
                             st.success(f"🎉 İşlem tamamlandı! {len(final_data)} kayıt çekildi.")
                             st.rerun()

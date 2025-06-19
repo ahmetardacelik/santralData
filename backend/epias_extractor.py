@@ -167,8 +167,58 @@ class EpiasExtractor:
                 'data': []
             }
     
+    def get_uevcb_list(self, organization_id: str) -> List[Dict]:
+        """Belirli bir santral için UEVCB listesini getir"""
+        if not self.tgt_token:
+            return []
+        
+        try:
+            self.logger.info(f"🔍 UEVCB listesi alınıyor - Organization ID: {organization_id}")
+            
+            url = f"{self.base_url}/data/uevcb-list"
+            
+            # Request body
+            payload = {
+                "organizationId": int(organization_id)
+            }
+            
+            self.logger.info(f"🌐 UEVCB API isteği: {url}")
+            self.logger.info(f"📦 UEVCB Payload: {payload}")
+            
+            response = self.session.post(url, json=payload, timeout=30)
+            
+            self.logger.info(f"📨 UEVCB Response Status: {response.status_code}")
+            self.logger.info(f"📨 UEVCB Response Headers: {dict(response.headers)}")
+            
+            if response.status_code == 200:
+                data = response.json()
+                self.logger.info(f"📊 UEVCB Raw Response: {data}")
+                
+                # Response yapısını kontrol et
+                if isinstance(data, dict) and 'body' in data and 'content' in data['body']:
+                    uevcbs = data['body']['content']
+                elif isinstance(data, dict) and 'items' in data:
+                    uevcbs = data['items']
+                elif isinstance(data, list):
+                    uevcbs = data
+                else:
+                    uevcbs = []
+                
+                self.logger.info(f"✅ {len(uevcbs)} UEVCB bulundu")
+                if uevcbs:
+                    self.logger.info(f"🔍 İlk UEVCB örneği: {uevcbs[0]}")
+                return uevcbs
+            else:
+                self.logger.error(f"❌ UEVCB listesi alınamadı: {response.status_code}")
+                self.logger.error(f"❌ UEVCB Response Text: {response.text}")
+                return []
+                
+        except Exception as e:
+            self.logger.error(f"❌ UEVCB listesi hatası: {e}")
+            return []
+
     def get_injection_quantity_data(self, start_date: str, end_date: str, power_plant_id: Optional[str] = None) -> List[Dict]:
-        """Enjeksiyon miktarı verilerini getir"""
+        """Enjeksiyon miktarı verilerini getir - EPIAS website ile aynı format"""
         if not self.tgt_token:
             return []
         
@@ -177,22 +227,77 @@ class EpiasExtractor:
             
             url = f"{self.base_url}/data/injection-quantity"
             
-            # Request body
+            # Request body - EPIAS website formatı
             payload = {
                 "startDate": start_date,
-                "endDate": end_date
+                "endDate": end_date,
+                "page": {
+                    "number": 1,
+                    "size": 24,
+                    "sort": {
+                        "direction": "ASC",
+                        "field": "date"
+                    }
+                }
             }
             
+            # Eğer power_plant_id varsa, powerplantId olarak ekle (lowercase 'p')
             if power_plant_id:
-                payload["powerPlantId"] = power_plant_id
+                payload["powerplantId"] = int(power_plant_id)
+                self.logger.info(f"🎯 Santral filtreleme: powerplantId = {power_plant_id}")
+            else:
+                self.logger.info(f"📊 Tüm santraller verisi çekiliyor")
             
-            response = self.session.post(url, json=payload, timeout=60)
+            self.logger.info(f"🌐 Injection API isteği: {url}")
+            self.logger.info(f"📦 Injection Payload: {payload}")
+            
+            # Headers - EPIAS website benzeri
+            headers = {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json, text/plain, */*',
+                'Origin': 'https://seffaflik.epias.com.tr',
+                'Referer': 'https://seffaflik.epias.com.tr/electricity/electricity-generation/ex-post-generation/injection-quantity',
+                'TGT': self.tgt_token
+            }
+            
+            response = self.session.post(url, json=payload, headers=headers, timeout=60)
+            
+            self.logger.info(f"📨 Injection Response Status: {response.status_code}")
+            self.logger.info(f"📨 Injection Response Headers: {dict(response.headers)}")
             
             if response.status_code == 200:
                 data = response.json()
+                self.logger.info(f"📊 Injection Raw Response: {str(data)[:500]}...")
                 
-                # Response yapısını kontrol et
-                if isinstance(data, dict) and 'items' in data:
+                # Response yapısını kontrol et - pagination destekli
+                if isinstance(data, dict) and 'content' in data:
+                    items = data['content']
+                    total_elements = data.get('totalElements', len(items))
+                    total_pages = data.get('totalPages', 1)
+                    self.logger.info(f"📄 Sayfalama: {total_elements} toplam kayıt, {total_pages} sayfa")
+                    
+                    # Eğer birden fazla sayfa varsa, hepsini çek
+                    if total_pages > 1:
+                        self.logger.info(f"📄 {total_pages} sayfa tespit edildi, hepsi çekiliyor...")
+                        all_items = items.copy()
+                        
+                        for page_num in range(2, total_pages + 1):
+                            page_payload = payload.copy()
+                            page_payload["page"]["number"] = page_num
+                            
+                            self.logger.info(f"📄 Sayfa {page_num} çekiliyor...")
+                            page_response = self.session.post(url, json=page_payload, headers=headers, timeout=60)
+                            
+                            if page_response.status_code == 200:
+                                page_data = page_response.json()
+                                if isinstance(page_data, dict) and 'content' in page_data:
+                                    all_items.extend(page_data['content'])
+                                    self.logger.info(f"✅ Sayfa {page_num}: {len(page_data['content'])} kayıt")
+                            else:
+                                self.logger.error(f"❌ Sayfa {page_num} alınamadı: {page_response.status_code}")
+                        
+                        items = all_items
+                elif isinstance(data, dict) and 'items' in data:
                     items = data['items']
                 elif isinstance(data, list):
                     items = data
@@ -200,9 +305,12 @@ class EpiasExtractor:
                     items = []
                 
                 self.logger.info(f"✅ {len(items)} kayıt alındı")
+                if items:
+                    self.logger.info(f"🔍 İlk injection record örneği: {items[0]}")
                 return items
             else:
                 self.logger.error(f"❌ Veri alınamadı: {response.status_code}")
+                self.logger.error(f"❌ Response Text: {response.text}")
                 return []
                 
         except Exception as e:
