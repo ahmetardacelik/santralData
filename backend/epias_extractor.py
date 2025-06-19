@@ -217,6 +217,66 @@ class EpiasExtractor:
             self.logger.error(f"❌ UEVCB listesi hatası: {e}")
             return []
 
+    def get_injection_quantity_data_export(self, start_date: str, end_date: str, power_plant_id: Optional[str] = None) -> List[Dict]:
+        """Try the export endpoint which might give individual plant data"""
+        if not self.tgt_token:
+            return []
+        
+        try:
+            self.logger.info(f"🔄 Trying EXPORT endpoint for individual plant data...")
+            
+            url = f"{self.base_url}/export/injection-quantity"
+            
+            payload = {
+                "startDate": start_date,
+                "endDate": end_date,
+                "format": "JSON"  # Try JSON format instead of XLSX
+            }
+            
+            if power_plant_id:
+                payload["powerplantId"] = int(power_plant_id)
+                self.logger.info(f"🎯 Export endpoint - powerplantId = {power_plant_id}")
+            
+            headers = {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json, text/plain, */*',
+                'Origin': 'https://seffaflik.epias.com.tr',
+                'Referer': 'https://seffaflik.epias.com.tr/electricity/electricity-generation/ex-post-generation/injection-quantity',
+                'TGT': self.tgt_token
+            }
+            
+            self.logger.info(f"🌐 Export API isteği: {url}")
+            self.logger.info(f"📦 Export Payload: {payload}")
+            
+            response = self.session.post(url, json=payload, headers=headers, timeout=60)
+            
+            self.logger.info(f"📨 Export Response Status: {response.status_code}")
+            
+            if response.status_code == 200:
+                data = response.json()
+                self.logger.info(f"📊 Export Raw Response: {str(data)[:500]}...")
+                
+                if isinstance(data, dict) and 'content' in data:
+                    items = data['content']
+                elif isinstance(data, list):
+                    items = data
+                else:
+                    items = []
+                
+                self.logger.info(f"✅ Export endpoint: {len(items)} kayıt alındı")
+                if items:
+                    self.logger.info(f"🔍 Export record örneği: {items[0]}")
+                    
+                return items
+            else:
+                self.logger.error(f"❌ Export endpoint failed: {response.status_code}")
+                self.logger.error(f"❌ Export Response: {response.text}")
+                return []
+                
+        except Exception as e:
+            self.logger.error(f"❌ Export endpoint hatası: {e}")
+            return []
+
     def get_injection_quantity_data(self, start_date: str, end_date: str, power_plant_id: Optional[str] = None) -> List[Dict]:
         """Enjeksiyon miktarı verilerini getir - EPIAS website ile aynı format"""
         if not self.tgt_token:
@@ -224,6 +284,16 @@ class EpiasExtractor:
         
         try:
             self.logger.info(f"📊 Enjeksiyon verileri alınıyor: {start_date} - {end_date}")
+            
+            # If we have a specific power plant, try export endpoint first
+            if power_plant_id:
+                self.logger.info(f"🔄 Specific plant requested - trying export endpoint first...")
+                export_data = self.get_injection_quantity_data_export(start_date, end_date, power_plant_id)
+                if export_data:
+                    self.logger.info(f"✅ Export endpoint successful, returning {len(export_data)} records")
+                    return export_data
+                else:
+                    self.logger.warning(f"⚠️ Export endpoint failed, falling back to data endpoint...")
             
             url = f"{self.base_url}/data/injection-quantity"
             
@@ -307,6 +377,48 @@ class EpiasExtractor:
                 self.logger.info(f"✅ {len(items)} kayıt alındı")
                 if items:
                     self.logger.info(f"🔍 İlk injection record örneği: {items[0]}")
+                    
+                    # Detailed analysis of data structure
+                    first_record = items[0]
+                    self.logger.info(f"🔍 Record keys: {list(first_record.keys())}")
+                    
+                    # Check if this looks like aggregate data or individual plant data
+                    if 'total' in first_record:
+                        total_value = first_record.get('total')
+                        self.logger.warning(f"⚠️ AGGREGATE DATA DETECTED: 'total' field found = {total_value}")
+                        self.logger.warning(f"⚠️ This suggests we're getting total energy production, not individual plant data!")
+                        
+                        # If we requested a specific plant but got aggregate data, this is wrong
+                        if power_plant_id:
+                            self.logger.error(f"🚨 CRITICAL ERROR: Requested plant {power_plant_id} but got aggregate data!")
+                            self.logger.error(f"🚨 The API is not filtering by powerplantId correctly!")
+                            
+                            # Check if the data has fields that suggest it's aggregate Turkey-wide data
+                            aggregate_fields = ['naturalGas', 'dam', 'lignite', 'river', 'importedCoal', 'sun', 'wind']
+                            found_aggregate_fields = [field for field in aggregate_fields if field in first_record]
+                            if found_aggregate_fields:
+                                self.logger.error(f"🚨 CONFIRMED AGGREGATE DATA: Found fields {found_aggregate_fields}")
+                                self.logger.error(f"🚨 This is Turkey-wide energy breakdown, not individual plant data!")
+                    
+                    if 'powerPlantId' in first_record:
+                        plant_id_in_data = first_record.get('powerPlantId')
+                        self.logger.info(f"✅ Individual plant data: powerPlantId = {plant_id_in_data}")
+                        if power_plant_id and str(plant_id_in_data) != str(power_plant_id):
+                            self.logger.warning(f"⚠️ Plant ID mismatch! Requested: {power_plant_id}, Got: {plant_id_in_data}")
+                    elif 'organizationId' in first_record:
+                        org_id_in_data = first_record.get('organizationId')
+                        self.logger.info(f"✅ Individual plant data: organizationId = {org_id_in_data}")
+                        if power_plant_id and str(org_id_in_data) != str(power_plant_id):
+                            self.logger.warning(f"⚠️ Organization ID mismatch! Requested: {power_plant_id}, Got: {org_id_in_data}")
+                    else:
+                        self.logger.warning(f"⚠️ No plant identifier found in record - this might be aggregate data")
+                        
+                    # Show more sample records to understand the pattern
+                    if len(items) > 1:
+                        self.logger.info(f"🔍 İkinci record örneği: {items[1]}")
+                    if len(items) > 2:
+                        self.logger.info(f"🔍 Üçüncü record örneği: {items[2]}")
+                        
                 return items
             else:
                 self.logger.error(f"❌ Veri alınamadı: {response.status_code}")

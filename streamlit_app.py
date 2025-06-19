@@ -194,7 +194,8 @@ st.markdown("""
     <p class="mega-subtitle">⚡ Türkiye Elektrik Piyasası Şeffaflık Platformu ⚡</p>
     <p class="mega-subtitle">🔥 WebSocket Güvenli Versiyon - ULTRA EDITION 🔥</p>
     <div class="version-badge">
-        🎯 VERSION 2.0 - EPIAS WEBSITE COMPATIBLE 🎯
+        🎯 VERSION 2.0 - EPIAS WEBSITE COMPATIBLE 🎯<br/>
+        📅 Updated: 2025-06-19 22:58 UTC
     </div>
 </div>
 """, unsafe_allow_html=True)
