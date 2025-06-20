@@ -59,123 +59,116 @@ def check_connection():
     st.session_state.connection_status = "disconnected"
     return False
 
-# Custom CSS - Connection-aware styling with BIG ANIMATED HEADER
+# Custom CSS - Clean and professional styling
 st.markdown("""
 <style>
-    @keyframes gradientShift {
-        0% { background-position: 0% 50%; }
-        50% { background-position: 100% 50%; }
-        100% { background-position: 0% 50%; }
-    }
-    
-    @keyframes pulse {
-        0% { transform: scale(1); }
-        50% { transform: scale(1.05); }
-        100% { transform: scale(1); }
-    }
-    
-    @keyframes slideIn {
-        0% { transform: translateY(-50px); opacity: 0; }
-        100% { transform: translateY(0); opacity: 1; }
-    }
-    
-    .mega-header {
-        background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab, #667eea, #764ba2);
-        background-size: 400% 400%;
-        animation: gradientShift 4s ease infinite;
-        padding: 4rem 2rem;
-        border-radius: 20px;
-        color: white;
-        text-align: center;
-        margin-bottom: 3rem;
-        box-shadow: 0 20px 40px rgba(0,0,0,0.3);
-        animation: slideIn 1.5s ease-out;
-    }
-    
-    .mega-title {
-        font-size: 4rem !important;
-        font-weight: 900 !important;
-        margin-bottom: 1rem !important;
-        text-shadow: 3px 3px 6px rgba(0,0,0,0.5);
-        animation: pulse 2s ease-in-out infinite;
-    }
-    
-    .mega-subtitle {
-        font-size: 1.8rem !important;
-        margin-bottom: 1rem !important;
-        opacity: 0.9;
-    }
-    
-    .version-badge {
-        display: inline-block;
-        background: rgba(255,255,255,0.2);
-        padding: 10px 20px;
-        border-radius: 50px;
-        font-weight: bold;
-        margin-top: 1rem;
-        border: 2px solid rgba(255,255,255,0.3);
-        animation: pulse 1.5s ease-in-out infinite;
-    }
-    
     .main-header {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 2rem;
-        border-radius: 10px;
+        background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+        padding: 2rem 3rem;
+        border-radius: 12px;
         color: white;
-        text-align: center;
         margin-bottom: 2rem;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+    
+    .main-title {
+        font-size: 2.5rem !important;
+        font-weight: 700 !important;
+        margin-bottom: 0.5rem !important;
+        text-align: center;
+    }
+    
+    .main-subtitle {
+        font-size: 1.1rem !important;
+        opacity: 0.9;
+        text-align: center;
+        margin-bottom: 1rem !important;
+    }
+    
+    .version-info {
+        background: rgba(255,255,255,0.1);
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        text-align: center;
+        border: 1px solid rgba(255,255,255,0.2);
     }
     .status-success {
-        background-color: #d4edda;
-        border: 1px solid #c3e6cb;
-        color: #155724;
-        padding: 0.75rem;
-        border-radius: 0.375rem;
+        background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+        border: 1px solid #10b981;
+        color: #064e3b;
+        padding: 1rem;
+        border-radius: 8px;
         margin: 1rem 0;
+        font-weight: 500;
     }
     .status-error {
-        background-color: #f8d7da;
-        border: 1px solid #f5c6cb;
-        color: #721c24;
-        padding: 0.75rem;
-        border-radius: 0.375rem;
+        background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+        border: 1px solid #ef4444;
+        color: #7f1d1d;
+        padding: 1rem;
+        border-radius: 8px;
         margin: 1rem 0;
+        font-weight: 500;
     }
     .status-warning {
-        background-color: #fff3cd;
-        border: 1px solid #ffeaa7;
-        color: #856404;
-        padding: 0.75rem;
-        border-radius: 0.375rem;
+        background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+        border: 1px solid #f59e0b;
+        color: #78350f;
+        padding: 1rem;
+        border-radius: 8px;
         margin: 1rem 0;
+        font-weight: 500;
     }
     .connection-indicator {
         position: fixed;
-        top: 10px;
-        right: 10px;
-        padding: 5px 10px;
-        border-radius: 15px;
-        font-size: 12px;
+        top: 20px;
+        right: 20px;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 13px;
         z-index: 999;
+        font-weight: 600;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
     }
     .connected {
-        background-color: #28a745;
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
         color: white;
     }
     .disconnected {
-        background-color: #dc3545;
+        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
         color: white;
     }
     .progress-container {
-        margin: 1rem 0;
-        padding: 1rem;
-        background-color: #f8f9fa;
-        border-radius: 0.5rem;
-        border: 1px solid #dee2e6;
+        margin: 1.5rem 0;
+        padding: 1.5rem;
+        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     }
     .stProgress > div > div > div > div {
-        background-color: #667eea;
+        background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
     }
+    
+    /* Form styling */
+    .stForm {
+        background: white;
+        padding: 2rem;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    /* Sidebar styling */
+    .css-1d391kg {
+        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    }
+    
+    /* Hide Streamlit branding */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -183,63 +176,28 @@ st.markdown("""
 connection_class = "connected" if st.session_state.connection_status == "connected" else "disconnected"
 st.markdown(f"""
 <div class="connection-indicator {connection_class}">
-    {"🟢 Bağlı" if st.session_state.connection_status == "connected" else "🔴 Bağlantı Kesildi"}
+    {"● Bağlı" if st.session_state.connection_status == "connected" else "● Bağlantı Kesildi"}
 </div>
 """, unsafe_allow_html=True)
 
-# MEGA ANIMATED HEADER - You will definitely see this!
+# Clean Professional Header
 st.markdown("""
-<div class="mega-header">
-    <h1 class="mega-title">🚀 EPIAS ELEKTRIK VERİSİ ÇEKİCİ 🚀</h1>
-    <p class="mega-subtitle">⚡ Türkiye Elektrik Piyasası Şeffaflık Platformu ⚡</p>
-    <p class="mega-subtitle">🔥 WebSocket Güvenli Versiyon - ULTRA EDITION 🔥</p>
-    <div class="version-badge">
-        🎯 VERSION 2.0 - EPIAS WEBSITE COMPATIBLE 🎯<br/>
-        📅 Updated: 2025-06-19 22:58 UTC
+<div class="main-header">
+    <h1 class="main-title">EPIAS Elektrik Verisi Çekici</h1>
+    <p class="main-subtitle">Türkiye Elektrik Piyasası Şeffaflık Platformu - Enjeksiyon Miktarı Verileri</p>
+    <div class="version-info">
+        Version 2.1 - Updated: 2025-06-19 23:15 UTC
     </div>
 </div>
 """, unsafe_allow_html=True)
 
 # Display backend import status
 if backend_import_success:
-    st.success("✅ Backend modülü başarıyla yüklendi!")
-    st.info("🆕 EPIAS website ile aynı API formatı - Artık santral filtreleme doğru çalışıyor!")
+    st.success("Backend modülü başarıyla yüklendi")
 else:
-    st.error(f"❌ Backend modülü yüklenemedi: {backend_import_error}")
-    st.error("Backend klasörünü ve epias_extractor.py dosyasını kontrol edin!")
+    st.error(f"Backend modülü yüklenemedi: {backend_import_error}")
+    st.error("Backend klasörünü ve epias_extractor.py dosyasını kontrol edin")
     st.stop()
-
-# Footer
-st.markdown("---")
-st.markdown("""
-<div style='text-align: center; color: #666; padding: 1rem;'>
-    <p>⚡ EPIAS Elektrik Verisi Çekici - WebSocket Güvenli Versiyon</p>
-    <p>Bağlantı problemlerinde otomatik olarak kaldığı yerden devam eder</p>
-</div>
-""", unsafe_allow_html=True)
-
-st.markdown("""
-    <div style='
-        background: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4, #ffeaa7);
-        background-size: 300% 300%;
-        animation: gradientShift 3s ease infinite;
-        padding: 25px;
-        text-align: center;
-        font-size: 36px;
-        font-weight: 900;
-        color: white;
-        text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
-        margin-bottom: 2rem;
-        border-radius: 15px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-    '>
-                 🎉 LATEST VERSION DEPLOYED - ANIMATION EDITION! 🎉
-         <br/>
-         <span style='font-size: 24px;'>🚀 GitHub → Streamlit Cloud Pipeline Working! 🚀</span>
-         <br/>
-         <span style='font-size: 18px;'>⏰ TIMESTAMP: 2025-01-19 12:10 PM - FORCED UPDATE! ⏰</span>
-    </div>
-    """, unsafe_allow_html=True)
 
 # Helper Functions - Connection-safe
 @st.cache_data(ttl=300)  # 5 dakika cache
@@ -374,18 +332,18 @@ def display_data_info(data, power_plant_id, power_plant_name):
 
 # Authentication Section
 if not st.session_state.authenticated:
-    st.header("🔐 EPIAS Giriş")
+    st.header("EPIAS Giriş")
     
     with st.form("login_form"):
         col1, col2 = st.columns(2)
         
         with col1:
-            username = st.text_input("👤 Kullanıcı Adı", placeholder="EPIAS kullanıcı adınız")
+            username = st.text_input("Kullanıcı Adı", placeholder="EPIAS kullanıcı adınız")
         
         with col2:
-            password = st.text_input("🔒 Şifre", type="password", placeholder="EPIAS şifreniz")
+            password = st.text_input("Şifre", type="password", placeholder="EPIAS şifreniz")
         
-        login_button = st.form_submit_button("🚀 Giriş Yap", use_container_width=True)
+        login_button = st.form_submit_button("Giriş Yap", use_container_width=True)
         
         if login_button:
             if username and password:
@@ -522,35 +480,35 @@ else:
                             st.error(f"❌ Excel oluşturma hatası: {e}")
     
     # Yeni veri çekme formu
-    st.subheader("🆕 Yeni Veri Çekme")
+    st.subheader("Veri Çekme")
     
     # Santral seçimi - OUTSIDE the form so it appears immediately
-    st.subheader("🏭 Santral Seçimi (İsteğe Bağlı)")
+    st.subheader("Santral Seçimi (İsteğe Bağlı)")
     
     use_specific_plants = st.checkbox("Belirli santrallar için veri çek")
     power_plant_id = None
     
     if use_specific_plants:
         # Santral arama input'unu hemen göster
-        st.markdown("**💡 İpucu:** 2496 santral arasından seçim yapmak için santral adını arayın!")
+        st.markdown("**İpucu:** 2496 santral arasından seçim yapmak için santral adını arayın!")
         
         # Hızlı arama için popüler santral tipleri
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("🔥 Termik Santraller", help="Termik santralları filtrele"):
+            if st.button("Termik Santraller", help="Termik santralları filtrele"):
                 search_term = "termik"
             else:
                 search_term = st.text_input(
-                    "🔍 Santral Ara", 
+                    "Santral Ara", 
                     placeholder="Örnek: Akenerji, Soma, Çatalağzı, vb...",
                     help="Santral adının bir bölümünü yazın. Büyük/küçük harf duyarlı değil."
                 )
         with col2:
-            if st.button("💨 Rüzgar Santralleri", help="Rüzgar santralları filtrele"):
+            if st.button("Rüzgar Santralleri", help="Rüzgar santralları filtrele"):
                 search_term = "rüzgar"
-            elif st.button("☀️ Güneş Santralleri", help="Güneş santralları filtrele"):
+            elif st.button("Güneş Santralleri", help="Güneş santralları filtrele"):
                 search_term = "güneş"
-            elif st.button("💧 Hidroelektrik", help="Hidroelektrik santralları filtrele"):
+            elif st.button("Hidroelektrik", help="Hidroelektrik santralları filtrele"):
                 search_term = "hidro"
         
         # Power plants'i yükle - UI blocking olmadan
@@ -560,15 +518,15 @@ else:
             # Filtreleme - Tüm santralleri göster
             if search_term:
                 filtered_plants = [p for p in power_plants if search_term.lower() in p.get('name', '').lower()]
-                st.info(f"🔍 Arama sonucu: {len(filtered_plants)} santral bulundu")
+                st.info(f"Arama sonucu: {len(filtered_plants)} santral bulundu")
             else:
                 filtered_plants = power_plants  # Tüm santralleri göster
-                st.info(f"📋 Toplam {len(filtered_plants)} santral mevcut (Arama yaparak filtreleyebilirsiniz)")
+                st.info(f"Toplam {len(filtered_plants)} santral mevcut (Arama yaparak filtreleyebilirsiniz)")
             
             if filtered_plants:
                 # Eğer çok fazla santral varsa kullanıcıyı uyar
                 if len(filtered_plants) > 100 and not search_term:
-                    st.warning("⚠️ Çok fazla santral var! Daha hızlı seçim için santral adı arayarak filtreleyebilirsiniz.")
+                    st.warning("Çok fazla santral var! Daha hızlı seçim için santral adı arayarak filtreleyebilirsiniz.")
                 
                 selected_plant = st.selectbox(
                     "Santral Seç",
@@ -590,8 +548,8 @@ else:
             power_plant_name = None
         else:
             # power_plants is None - loading or error state
-            st.warning("⚠️ Santral listesi yükleniyor... Bağlantı problemi varsa bir süre bekleyin.")
-            if st.button("🔄 Santral Listesini Yenile", key="reload_plants"):
+            st.warning("Santral listesi yükleniyor... Bağlantı problemi varsa bir süre bekleyin.")
+            if st.button("Santral Listesini Yenile", key="reload_plants"):
                 st.cache_data.clear()
                 st.rerun()
             power_plant_id = None
@@ -606,19 +564,19 @@ else:
         
         with col1:
             start_date = st.date_input(
-                "📅 Başlangıç Tarihi",
+                "Başlangıç Tarihi",
                 value=date.today() - timedelta(days=30),
                 max_value=date.today()
             )
         
         with col2:
             end_date = st.date_input(
-                "📅 Bitiş Tarihi",
+                "Bitiş Tarihi",
                 value=date.today() - timedelta(days=1),
                 max_value=date.today()
             )
         
-        extract_button = st.form_submit_button("🚀 Veri Çekmeyi Başlat", use_container_width=True)
+        extract_button = st.form_submit_button("Veri Çekmeyi Başlat", use_container_width=True)
         
         if extract_button:
             if start_date <= end_date:
