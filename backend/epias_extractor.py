@@ -339,40 +339,73 @@ class EpiasExtractor:
                 data = response.json()
                 self.logger.info(f"📊 Injection Raw Response: {str(data)[:500]}...")
                 
-                # Response yapısını kontrol et - pagination destekli
-                if isinstance(data, dict) and 'content' in data:
-                    items = data['content']
-                    total_elements = data.get('totalElements', len(items))
-                    total_pages = data.get('totalPages', 1)
-                    self.logger.info(f"📄 Sayfalama: {total_elements} toplam kayıt, {total_pages} sayfa")
+                # Response yapısını kontrol et - EPIAS website ile aynı format
+                if isinstance(data, dict) and 'items' in data:
+                    items = data['items']
                     
-                    # Eğer birden fazla sayfa varsa, hepsini çek
-                    if total_pages > 1:
-                        self.logger.info(f"📄 {total_pages} sayfa tespit edildi, hepsi çekiliyor...")
-                        all_items = items.copy()
+                    # Handle pagination like real EPIAS website
+                    page_info = data.get('page', {})
+                    total_records = page_info.get('total', len(items))
+                    current_page = page_info.get('number', 1)
+                    page_size = page_info.get('size', len(items))
+                    
+                    self.logger.info(f"📄 PAGINATION: Page {current_page}, Total records: {total_records}, Page size: {page_size}")
+                    
+                    # Show totals summary if available (like your real data)
+                    if 'totals' in data:
+                        totals = data['totals']
+                        total_total = totals.get('totalTotal', 0)
+                        self.logger.info(f"📊 PERIOD TOTALS: Total energy = {total_total} MWh")
+                        
+                        # Show active energy types from totals
+                        energy_total_fields = ['naturalGasTotal', 'damTotal', 'ligniteTotal', 'riverTotal', 'importedCoalTotal', 
+                                             'sunTotal', 'windTotal', 'biomassTotal', 'geothermalTotal', 'fueloilTotal', 
+                                             'asphaltiteTotal', 'stoneCoalTotal', 'naphtaTotal', 'lngTotal']
+                        active_totals = {k.replace('Total', ''): v for k, v in totals.items() if k in energy_total_fields and v > 0}
+                        if active_totals:
+                            self.logger.info(f"⚡ ACTIVE ENERGY TYPES (Period totals): {active_totals}")
+                    
+                    # If there are more pages, collect all data
+                    all_items = items.copy()
+                    if total_records > len(items):
+                        total_pages = (total_records + page_size - 1) // page_size  # Ceiling division
+                        self.logger.info(f"📚 MULTI-PAGE DETECTED: {total_records} total records across {total_pages} pages")
                         
                         for page_num in range(2, total_pages + 1):
                             page_payload = payload.copy()
                             page_payload["page"]["number"] = page_num
                             
-                            self.logger.info(f"📄 Sayfa {page_num} çekiliyor...")
+                            self.logger.info(f"📄 Fetching page {page_num}/{total_pages}...")
                             page_response = self.session.post(url, json=page_payload, headers=headers, timeout=60)
                             
                             if page_response.status_code == 200:
                                 page_data = page_response.json()
-                                if isinstance(page_data, dict) and 'content' in page_data:
-                                    all_items.extend(page_data['content'])
-                                    self.logger.info(f"✅ Sayfa {page_num}: {len(page_data['content'])} kayıt")
+                                if isinstance(page_data, dict) and 'items' in page_data:
+                                    page_items = page_data['items']
+                                    all_items.extend(page_items)
+                                    self.logger.info(f"📄 Page {page_num}: Added {len(page_items)} records (Total: {len(all_items)})")
+                                else:
+                                    self.logger.warning(f"⚠️ Page {page_num} unexpected format")
+                                    break
                             else:
-                                self.logger.error(f"❌ Sayfa {page_num} alınamadı: {page_response.status_code}")
+                                self.logger.error(f"❌ Page {page_num} failed: {page_response.status_code}")
+                                break
                         
-                        items = all_items
-                elif isinstance(data, dict) and 'items' in data:
-                    items = data['items']
+                        self.logger.info(f"✅ PAGINATION COMPLETE: Collected {len(all_items)} total records")
+                    else:
+                        self.logger.info(f"📄 SINGLE PAGE: All {len(items)} records fit on one page")
+                    
+                    items = all_items
+                elif isinstance(data, dict) and 'content' in data:
+                    # Fallback for old format
+                    items = data['content']
+                    self.logger.warning(f"⚠️ Using fallback 'content' format")
                 elif isinstance(data, list):
                     items = data
+                    self.logger.warning(f"⚠️ Direct list format")
                 else:
                     items = []
+                    self.logger.warning(f"⚠️ Unknown response format: {type(data)}")
                 
                 self.logger.info(f"✅ {len(items)} kayıt alındı")
                 if items:
@@ -382,23 +415,38 @@ class EpiasExtractor:
                     first_record = items[0]
                     self.logger.info(f"🔍 Record keys: {list(first_record.keys())}")
                     
-                    # Check if this looks like aggregate data or individual plant data
+                    # Analyze data structure to understand if this is individual or aggregate data
                     if 'total' in first_record:
                         total_value = first_record.get('total')
-                        self.logger.warning(f"⚠️ AGGREGATE DATA DETECTED: 'total' field found = {total_value}")
-                        self.logger.warning(f"⚠️ This suggests we're getting total energy production, not individual plant data!")
+                        self.logger.info(f"📊 DATA ANALYSIS: 'total' field found = {total_value}")
                         
-                        # If we requested a specific plant but got aggregate data, this is wrong
+                        # Check if this is individual plant data (only one energy type has values) vs aggregate (multiple types)
+                        energy_fields = ['naturalGas', 'dam', 'lignite', 'river', 'importedCoal', 'sun', 'wind', 'biomass', 'geothermal', 'fueloil', 'asphaltite', 'stoneCoal', 'naphtha', 'lng']
+                        non_zero_fields = [field for field in energy_fields if field in first_record and first_record.get(field, 0) > 0]
+                        
+                        if len(non_zero_fields) == 0:
+                            self.logger.info(f"💤 ZERO PRODUCTION: Plant has no energy production in this time period")
+                        elif len(non_zero_fields) == 1:
+                            energy_type = non_zero_fields[0]
+                            self.logger.info(f"✅ INDIVIDUAL PLANT DATA: Single energy type '{energy_type}' = {first_record.get(energy_type)}")
+                            self.logger.info(f"✅ This appears to be individual power plant data (single energy source)")
+                        else:
+                            self.logger.warning(f"⚠️ MULTIPLE ENERGY TYPES: {non_zero_fields}")
+                            if power_plant_id:
+                                self.logger.warning(f"⚠️ Requested specific plant {power_plant_id} but got multiple energy types")
+                                self.logger.warning(f"⚠️ This might be aggregate data or a multi-source plant")
+                            else:
+                                self.logger.info(f"📊 Expected: Multiple energy types for aggregate Turkey data")
+                        
+                        # Show energy breakdown for clarity
+                        energy_breakdown = {field: first_record.get(field, 0) for field in energy_fields if field in first_record}
+                        non_zero_breakdown = {k: v for k, v in energy_breakdown.items() if v > 0}
+                        self.logger.info(f"⚡ ENERGY BREAKDOWN: {non_zero_breakdown}")
+                        
                         if power_plant_id:
-                            self.logger.error(f"🚨 CRITICAL ERROR: Requested plant {power_plant_id} but got aggregate data!")
-                            self.logger.error(f"🚨 The API is not filtering by powerplantId correctly!")
-                            
-                            # Check if the data has fields that suggest it's aggregate Turkey-wide data
-                            aggregate_fields = ['naturalGas', 'dam', 'lignite', 'river', 'importedCoal', 'sun', 'wind']
-                            found_aggregate_fields = [field for field in aggregate_fields if field in first_record]
-                            if found_aggregate_fields:
-                                self.logger.error(f"🚨 CONFIRMED AGGREGATE DATA: Found fields {found_aggregate_fields}")
-                                self.logger.error(f"🚨 This is Turkey-wide energy breakdown, not individual plant data!")
+                            self.logger.info(f"🎯 PLANT {power_plant_id} ANALYSIS: Total={total_value}, Active sources={len(non_zero_fields)}")
+                        else:
+                            self.logger.info(f"🌍 AGGREGATE DATA ANALYSIS: Total={total_value}, Active sources={len(non_zero_fields)}")
                     
                     if 'powerPlantId' in first_record:
                         plant_id_in_data = first_record.get('powerPlantId')
